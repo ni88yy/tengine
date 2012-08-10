@@ -1227,6 +1227,8 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
         r->request_body->buf->tag = u->output.tag;
     }
 
+    /* TODO: output filter init */
+
     u->request_sent = 0;
 
     if (rc == NGX_AGAIN) {

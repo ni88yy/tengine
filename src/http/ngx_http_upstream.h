@@ -291,6 +291,12 @@ struct ngx_http_upstream_s {
     ngx_chain_t                     *busy_bufs;
     ngx_chain_t                     *free_bufs;
 
+    /* Nginx => Upstream */
+    ngx_int_t                      (*output_filter_init)(void *data);
+    ngx_int_t                      (*ouput_filter)(void *data, ssize_t bytes);
+    void                            *output_filter_ctx;
+
+    /* Upstream => Nginx */
     ngx_int_t                      (*input_filter_init)(void *data);
     ngx_int_t                      (*input_filter)(void *data, ssize_t bytes);
     void                            *input_filter_ctx;
