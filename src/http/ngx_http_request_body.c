@@ -14,7 +14,7 @@ static void ngx_http_read_client_request_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_do_read_client_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_write_request_body(ngx_http_request_t *r,
     ngx_chain_t *body);
-static ngx_int_t ngx_http_read_no_buffered_client_request_body(
+static ngx_int_t ngx_http_read_non_buffered_client_request_body(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
@@ -41,7 +41,7 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_core_loc_conf_t  *clcf;
 
     if (!r->request_buffering) {
-        rc = ngx_http_read_no_buffered_client_request_body(r);
+        rc = ngx_http_read_non_buffered_client_request_body(r);
 
         if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
             return rc;
@@ -474,8 +474,9 @@ ngx_http_write_request_body(ngx_http_request_t *r, ngx_chain_t *body)
 }
 
 
+/* TODO: add the postpone sending part */
 static ngx_int_t
-ngx_http_read_no_buffered_client_request_body(ngx_http_request_t *r)
+ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r)
 {
     off_t                      length;
     size_t                     preread;
