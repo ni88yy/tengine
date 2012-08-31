@@ -586,7 +586,7 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r)
         if (rb->rest <= (off_t) (b->end - b->last)) {
 
             /* the whole request body could be placed in r->header_in */
-            return ngx_http_do_read_no_buffered_client_request_body(r);
+            return ngx_http_do_read_non_buffered_client_request_body(r);
         }
 
         next = &rb->bufs->next;
@@ -627,7 +627,7 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r)
         next = &rb->bufs;
     }
 
-    rc = ngx_http_do_read_no_buffered_client_request_body(r);
+    rc = ngx_http_do_read_non_buffered_client_request_body(r);
 
     /* The zero buffer should not be appended to the rb->bufs */
     if (ngx_buf_size(rb->buf)) {
@@ -647,7 +647,7 @@ ngx_http_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
 
 ngx_int_t
-ngx_http_do_read_no_buffered_client_request_body(ngx_http_request_t *r)
+ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 {
     size_t                     size;
     ssize_t                    n;

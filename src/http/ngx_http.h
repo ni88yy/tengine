@@ -121,7 +121,7 @@ ngx_int_t ngx_http_send_special(ngx_http_request_t *r, ngx_uint_t flags);
 
 ngx_int_t ngx_http_read_client_request_body(ngx_http_request_t *r,
     ngx_http_client_body_handler_pt post_handler);
-ngx_int_t ngx_http_do_read_no_buffered_client_request_body(
+ngx_int_t ngx_http_do_read_non_buffered_client_request_body(
     ngx_http_request_t *r);
 
 ngx_int_t ngx_http_send_header(ngx_http_request_t *r);
