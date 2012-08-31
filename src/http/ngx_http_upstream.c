@@ -1191,6 +1191,8 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     if (!r->request_buffering && u->request_body_sent) {
         ngx_http_upstream_finalize_request(r, u,
                                            NGX_HTTP_INTERNAL_SERVER_ERROR);
+
+        return;
     }
 
     if (u->request_sent) {
@@ -1487,8 +1489,9 @@ static void
 ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u)
 {
+    off_t                      rest;
     ngx_int_t                  rc;
-    ngx_chain_t               *in, chain;
+    ngx_chain_t               *in;
     ngx_connection_t          *c;
     ngx_http_request_body_t   *rb;
 
@@ -1502,12 +1505,51 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         return;
     }
 
+    rb = r->request_body;
     in = NULL;
 
     for ( ;; ) {
 
         if (!u->request_sent) {
             in = u->request_bufs;
+
+        } else if (rb) {
+            c->log->action = "reading no buffered request body from client";
+
+            ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &rb->bufs,
+                    (ngx_buf_tag_t) &ngx_http_core_module);
+
+            rb->last_out = &rb->bufs;
+            rest = rb->rest;
+
+            rc = ngx_http_do_read_non_buffered_client_request_body(r);
+
+            if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
+                ngx_http_upstream_finalize_request(r, u, rc);
+                return;
+            }
+
+            if (rc == NGX_OK && rest == rb->rest) {
+                r->read_event_handler =
+                    ngx_http_upstream_rd_check_broken_connection;
+
+                break;
+            }
+
+            if (rc == NGX_AGAIN && rest == rb->rest) {
+
+                r->read_event_handler =
+                    ngx_http_upstream_read_non_buffered_request;
+
+                if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+                    ngx_http_upstream_finalize_request(r, u,
+                            NGX_HTTP_INTERNAL_SERVER_ERROR);
+                }
+
+                return;
+            }
+
+            in = rb->bufs;;
         }
 
         c->log->action = "sending no buffered request to upstream";
@@ -1547,48 +1589,11 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         /* rc == NGX_OK */
 
-        rb = r->request_body;
-
-        if (rb == NULL || rb->rest == 0 || rb->buf == NULL) {
-            break;
-        }
-
         u->request_body_sent = 1;
 
-        c->log->action = "reading no buffered request body from client";
-
-        if (rb->buf->pos == rb->buf->last) {
-            rb->buf->pos = rb->buf->start;
-            rb->buf->last = rb->buf->start;
-        }
-
-        rc = ngx_http_do_read_non_buffered_client_request_body(r);
-
-        if (rc >= NGX_HTTP_SPECIAL_RESPONSE) {
-            ngx_http_upstream_finalize_request(r, u, rc);
-            return;
-        }
-
-        if (rc == NGX_OK && ngx_buf_size(rb->buf) == 0) {
-            r->read_event_handler = ngx_http_upstream_rd_check_broken_connection;
+        if (rb == NULL || rb->rest == 0) {
             break;
         }
-
-        if (rc == NGX_AGAIN && ngx_buf_size(rb->buf) == 0) {
-
-            r->read_event_handler = ngx_http_upstream_read_non_buffered_request;
-
-            if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
-                ngx_http_upstream_finalize_request(r, u,
-                                 NGX_HTTP_INTERNAL_SERVER_ERROR);
-            }
-
-            return;
-        }
-
-        in = &chain;
-        in->buf = rb->buf;
-        in->next = NULL;
     }
 
     /* send all the request body */
