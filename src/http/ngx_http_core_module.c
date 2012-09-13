@@ -3779,7 +3779,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                               (size_t) 2 * ngx_pagesize);
     ngx_conf_merge_size_value(conf->client_body_postpone_sending,
                               prev->client_body_postpone_sending,
-                              conf->client_body_buffer_size);
+                              64 * 1024);
     ngx_conf_merge_msec_value(conf->client_body_timeout,
                               prev->client_body_timeout, 60000);
 

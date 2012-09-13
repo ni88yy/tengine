@@ -60,7 +60,14 @@ ngx_http_read_client_request_body(ngx_http_request_t *r,
         }
 
         /* NGX_OK */
-        r->request_body->buffered = 0;
+
+
+        rb = r->request_body;
+
+        if (rb && rb->buffered == 0) {
+            return rc;
+        }
+
         post_handler(r);
 
         return rc;
@@ -699,6 +706,10 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
             rb->rest -= n;
             r->request_length += n;
 
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http no buffered client request body "
+                           "request_length: %O", r->request_length);
+
             if (rb->rest == 0) {
                 break;
             }
@@ -741,6 +752,11 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
     }
 
     r->read_event_handler = ngx_http_block_reading;
+
+    if (rb->buffered) {
+        rb->buffered = 0;
+        rb->post_handler(r);
+    }
 
     return NGX_OK;
 }
