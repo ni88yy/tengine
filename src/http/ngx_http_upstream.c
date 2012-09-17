@@ -1517,6 +1517,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         } else if (rb && rb->rest) {
             c->log->action = "reading no buffered request body from client";
 
+            rb->bufs = NULL;
             rb->last_out = &rb->bufs;
             rest = rb->rest;
 
@@ -1556,7 +1557,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         ngx_buf_t   *buf;
         ngx_chain_t *cl;
 
-        for (cl = rb->bufs; cl; cl = cl->next) {
+        for (cl = out; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http upstream send out bufs: p=%p, size=%uO",
@@ -1566,14 +1567,22 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
         rc = ngx_output_chain(&u->output, out);
 
-        ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &rb->bufs,
+        ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &out,
                                 (ngx_buf_tag_t) &ngx_http_core_module);
+
 #if 1
         for (cl = rb->busy; cl; cl = cl->next) {
             buf = cl->buf;
-            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "http upstream send busy bufs: p=%p, size=%uO",
-                           buf, ngx_buf_size(buf));
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream send busy bufs: p=%p, s=%d, size=%uO",
+                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
+        }
+
+        for (cl = rb->free; cl; cl = cl->next) {
+            buf = cl->buf;
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream send free bufs: p=%p, s=%d, size=%uO",
+                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 #endif
 
@@ -1699,15 +1708,16 @@ ngx_http_upstream_send_request_handler(ngx_http_request_t *r,
 
 #endif
 
-    if (u->header_sent) {
-        u->write_event_handler = ngx_http_upstream_dummy_handler;
-
-        (void) ngx_handle_write_event(c->write, 0);
-
-        return;
-    }
-
     if (r->request_buffering) {
+
+        if (u->header_sent) {
+            u->write_event_handler = ngx_http_upstream_dummy_handler;
+
+            (void) ngx_handle_write_event(c->write, 0);
+
+            return;
+        }
+
         ngx_http_upstream_send_request(r, u);
 
     } else {
