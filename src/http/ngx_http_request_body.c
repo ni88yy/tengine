@@ -20,6 +20,7 @@ static ngx_int_t ngx_http_read_non_buffered_client_request_body(
 static void ngx_http_read_non_buffered_client_request_body_handler(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_request_body_get_buf(ngx_http_request_t *r);
+static void ngx_http_request_body_check_buf(ngx_http_request_body_t *rb);
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 
@@ -666,6 +667,10 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                 }
             }
 
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream read buf: p=%p, size=%uO",
+                           rb->buf, ngx_buf_size(rb->buf));
+
             size = rb->buf->end - rb->buf->last;
 
             if ((off_t) size > rb->rest) {
@@ -727,6 +732,8 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
                 break;
             }
         }
+
+        ngx_http_request_body_check_buf(rb);
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http client non buffered request body rest %O",
@@ -802,6 +809,57 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
     rb->last_out = &cl->next;
 
     return NGX_OK;
+}
+
+
+static void
+ngx_http_request_body_check_buf(ngx_http_request_body_t *rb)
+{
+    
+#if 0
+    ngx_chain_t  *cl;
+
+    cl = rb->bufs;
+    rb->last_out = &rb->bufs;
+
+    if (cl == NULL) {
+        return;
+    }
+
+    while (cl->next) {
+        rb->last_out = &cl->next;
+        cl = cl->next;
+    }
+
+    if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
+        *rb->last_out = NULL;
+        cl->next = rb->free;
+        rb->free = cl;
+    } else {
+        rb->last_out = &cl->next;
+    }
+
+    while (cl) {
+
+        b = cl->buf;
+
+        if (ngx_buf_size(b) == 0 && !ngx_buf_special(b)) {
+
+            free = cl;
+            *rb->last_out = cl->next;
+            rb->last_out = &cl->next;
+            cl = cl->next;
+
+            /* Free this buffer to the free pool */
+            free->next = rb->free;
+            rb->free = free;
+            continue;
+        }
+
+        rb->last_out = &cl->next;
+        cl = cl->next;
+    }
+#endif
 }
 
 

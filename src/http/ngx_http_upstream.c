@@ -1518,6 +1518,7 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
             c->log->action = "reading no buffered request body from client";
 
             rb->bufs = NULL;
+            rb->buf = NULL;
             rb->last_out = &rb->bufs;
             rest = rb->rest;
 
@@ -1527,6 +1528,8 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                 ngx_http_upstream_finalize_request(r, u, rc);
                 return;
             }
+
+            out = rb->bufs;;
 
             if (rc == NGX_OK && rest == rb->rest) {
                 r->read_event_handler =
@@ -1547,21 +1550,35 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
                 return;
             }
-
-            out = rb->bufs;;
         }
 
         c->log->action = "sending no buffered request to upstream";
 
 #if 1
         ngx_buf_t   *buf;
-        ngx_chain_t *cl;
+        ngx_chain_t *cl, **pre;
 
         for (cl = out; cl; cl = cl->next) {
             buf = cl->buf;
             ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
                            "http upstream send out bufs: p=%p, size=%uO",
                            buf, ngx_buf_size(buf));
+        }
+
+        cl = out;
+        pre = &out;
+
+        if (cl) {
+            while (cl->next) {
+                pre = &cl->next;
+                cl = cl->next;
+            }
+
+            if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
+                *pre = NULL;
+                cl->next = rb->free;
+                rb->free = cl;
+            }
         }
 #endif
 
