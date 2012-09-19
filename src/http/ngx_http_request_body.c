@@ -20,7 +20,7 @@ static ngx_int_t ngx_http_read_non_buffered_client_request_body(
 static void ngx_http_read_non_buffered_client_request_body_handler(
     ngx_http_request_t *r);
 static ngx_int_t ngx_http_request_body_get_buf(ngx_http_request_t *r);
-static void ngx_http_request_body_check_buf(ngx_http_request_body_t *rb);
+static void ngx_http_request_body_chomp_buf(ngx_http_request_body_t *rb);
 static ngx_int_t ngx_http_read_discarded_request_body(ngx_http_request_t *r);
 static ngx_int_t ngx_http_test_expect(ngx_http_request_t *r);
 
@@ -721,6 +721,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
 
             if (rb->buffered &&
                 r->request_length >= (off_t) clcf->client_body_postpone_sending) {
+                ngx_http_request_body_chomp_buf(rb);
 
                 rb->buffered = 0;
                 rb->post_handler(r);
@@ -733,11 +734,7 @@ ngx_http_do_read_non_buffered_client_request_body(ngx_http_request_t *r)
             }
         }
 
-        ngx_http_request_body_check_buf(rb);
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "http client non buffered request body rest %O",
-                       rb->rest);
+        ngx_http_request_body_chomp_buf(rb);
 
         if (rb->rest == 0) {
             break;
@@ -812,54 +809,36 @@ ngx_http_request_body_get_buf(ngx_http_request_t *r)
 }
 
 
+/* chomp the last zero buffer when possible */
 static void
-ngx_http_request_body_check_buf(ngx_http_request_body_t *rb)
+ngx_http_request_body_chomp_buf(ngx_http_request_body_t *rb)
 {
     
-#if 0
-    ngx_chain_t  *cl;
+    ngx_chain_t  *cl, **pre;
 
     cl = rb->bufs;
-    rb->last_out = &rb->bufs;
+    pre = &rb->bufs;
 
     if (cl == NULL) {
         return;
     }
 
     while (cl->next) {
-        rb->last_out = &cl->next;
+        pre = &cl->next;
         cl = cl->next;
     }
 
     if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
-        *rb->last_out = NULL;
+
+        rb->buf = NULL;
+        *pre = NULL;
+
+        rb->last_out = pre;
+
         cl->next = rb->free;
         rb->free = cl;
-    } else {
-        rb->last_out = &cl->next;
+
     }
-
-    while (cl) {
-
-        b = cl->buf;
-
-        if (ngx_buf_size(b) == 0 && !ngx_buf_special(b)) {
-
-            free = cl;
-            *rb->last_out = cl->next;
-            rb->last_out = &cl->next;
-            cl = cl->next;
-
-            /* Free this buffer to the free pool */
-            free->next = rb->free;
-            rb->free = free;
-            continue;
-        }
-
-        rb->last_out = &cl->next;
-        cl = cl->next;
-    }
-#endif
 }
 
 

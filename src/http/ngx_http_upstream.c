@@ -1505,6 +1505,12 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
         return;
     }
 
+    /* 
+     * We use the upstream connection write event to read data from client,
+     * and we disable the read event with client.
+     * */
+    r->read_event_handler = ngx_http_upstream_rd_check_broken_connection;
+
     rb = r->request_body;
 
     for ( ;; ) {
@@ -1532,9 +1538,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
             out = rb->bufs;;
 
             if (rc == NGX_OK && rest == rb->rest) {
-                r->read_event_handler =
-                    ngx_http_upstream_rd_check_broken_connection;
-
                 break;
             }
 
@@ -1556,33 +1559,20 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
 
 #if 1
         ngx_buf_t   *buf;
-        ngx_chain_t *cl, **pre;
+        ngx_chain_t *cl;
 
         for (cl = out; cl; cl = cl->next) {
             buf = cl->buf;
-            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "http upstream send out bufs: p=%p, size=%uO",
-                           buf, ngx_buf_size(buf));
-        }
-
-        cl = out;
-        pre = &out;
-
-        if (cl) {
-            while (cl->next) {
-                pre = &cl->next;
-                cl = cl->next;
-            }
-
-            if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
-                *pre = NULL;
-                cl->next = rb->free;
-                rb->free = cl;
-            }
+            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream send out bufs: p=%p, s=%d, size=%uO",
+                           buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 #endif
 
         rc = ngx_output_chain(&u->output, out);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "http upstream send no buffered request: rc=%i", rc);
 
         ngx_chain_update_chains(r->pool, &rb->free, &rb->busy, &out,
                                 (ngx_buf_tag_t) &ngx_http_core_module);
@@ -1602,9 +1592,6 @@ ngx_http_upstream_send_non_buffered_request(ngx_http_request_t *r,
                            buf, ngx_buf_special(buf), ngx_buf_size(buf));
         }
 #endif
-
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "http upstream send no buffered request: rc=%i", rc);
 
         u->request_sent = 1;
 

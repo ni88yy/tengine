@@ -118,11 +118,6 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
                 continue;
             }
 
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ctx->pool->log, 0,
-                           "http test busy1 bufs: p=%p, s=%d, size=%uO",
-                           ctx->in->buf, ngx_buf_special(ctx->in->buf),
-                           ngx_buf_size(ctx->in->buf));
-
             if (ngx_output_chain_as_is(ctx, ctx->in->buf)) {
 
                 /* move the chain link to the output chain */
@@ -166,11 +161,6 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
                     }
                 }
             }
-
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, ctx->pool->log, 0,
-                           "http test busy bufs: p=%p, s=%d, size=%uO",
-                           ctx->in->buf, ngx_buf_special(ctx->in->buf),
-                           ngx_buf_size(ctx->in->buf));
 
             rc = ngx_output_chain_copy_buf(ctx);
 

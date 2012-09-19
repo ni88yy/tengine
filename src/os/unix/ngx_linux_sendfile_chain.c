@@ -335,10 +335,6 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
                 break;
             }
 
-            ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "http test bufs: p=%p, s=%d, size=%uO",
-                           cl->buf, ngx_buf_special(cl->buf), ngx_buf_size(cl->buf));
-
             size = ngx_buf_size(cl->buf);
 
             if (sent >= size) {
